@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/usr/include",
-                "${workspaceFolder}/src"
+                "${workspaceFolder}/src",
+                "/usr/include/mysql"
             ],
             "defines": [],
             "cStandard": "c17",
