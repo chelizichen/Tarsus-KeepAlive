@@ -1,111 +1,105 @@
 #include <iostream>
 #include <boost/asio.hpp>
-#include <thread>
 #include <chrono>
+#include <thread>
+#include <string>
+#include <mysql/mysql.h>
 
 using namespace std;
 
-namespace LogServerParams {
-    struct DbConfig {
-        string host = "127.0.0.1";
-        string port = "3306";
-        string userName = "root";
-        string password = "123456"; // 修正拼写错误
+namespace logServerParams
+{
+    struct init {
+        unsigned int port;
+        db_config dbConfig;
     };
 
-    struct logServerConfig {
-        string serverName;
-        DbConfig dbConfig;
+    struct db_config {
+        unsigned int port;
+        char host;
+        char user;
+        char password;
+        char dbName;
     };
+} // namespace logServerParams
 
-    struct contentStruct {
-        /* data */
-    };
 
-    struct contentConfig {
-        /* data */
-    };
-};
 
-class logServer {
+class logServer
+{
 private:
-    string name;
-    string date;
-    string serverName;
-    LogServerParams::DbConfig dbConfig;
-    bool running_ = false;
-    std::thread timer_;
-
+    /* data */
+    unsigned int port = 8080;
+    logServerParams::init initConfig;
+    MYSQL *conn;
 public:
-    logServer(LogServerParams::logServerConfig serverConfig);
+    logServer(logServerParams::init initConfig);
+    logServer();
     ~logServer();
-    string getLogName();
-    bool Connect2DataBase();
-    void Log2DataBase(const std::string& tag, const std::string& message);
-    LogServerParams::contentStruct Log2HTML(LogServerParams::contentConfig contentConfig);
-    void WatchPort(int port, int intervalSeconds);
-    void StartWatchPort(int port, int intervalSeconds);
+    void watch_port();
+    void watch_port_thread_fn();
+    void initDataBase();
 };
 
-logServer::logServer(LogServerParams::logServerConfig serverConfig)
-    : serverName(serverConfig.serverName), dbConfig(serverConfig.dbConfig) {} // 使用成员初始化列表初始化成员变量
+logServer::logServer(logServerParams::init initConfig){
+    this->initConfig = initConfig;
+    this->initDataBase();
+    
+    watch_port_thread_fn();
+}
 
-logServer::~logServer() {
-    running_ = false;
-    if (timer_.joinable()) {
-        timer_.join();
+void logServer::initDataBase(){
+    conn = mysql_init(nullptr);
+    if (conn == nullptr) {
+        std::cerr << "mysql_init failed." << std::endl;
+    }
+    // 连接到本地 MySQL 数据库
+    const char *host = &this->initConfig.dbConfig.host;
+    const char *user = &this->initConfig.dbConfig.user; // 替换为您的 MySQL 用户名
+    const char *password = &this->initConfig.dbConfig.user; // 替换为您的 MySQL 密码
+    const char *dbname = &this->initConfig.dbConfig.dbName; // 替换为您的数据库名称
+    unsigned int port = this->initConfig.dbConfig.port; // 默认 MySQL 端口号
+
+    if (mysql_real_connect(conn, host, user, password, dbname, port, nullptr, 0) == nullptr) {
+        std::cerr << "mysql_real_connect failed: " << mysql_error(conn) << std::endl;
+        mysql_close(conn);
     }
 }
 
-string logServer::getLogName() {
-    return this->name + this->date;
+logServer::logServer(){
+    watch_port_thread_fn();
 }
 
-bool logServer::Connect2DataBase() {
-    // 实现数据库连接逻辑
-    return true; // 根据实际情况返回连接结果
-}
-
-void logServer::WatchPort(int port, int intervalSeconds) {
-    std::cout << "-------- START_2_WATCH_PORT --------- "<< std::endl;
-    std::chrono::milliseconds interval(intervalSeconds); // 转换为毫秒
-    boost::asio::io_service io_service;
-    boost::asio::ip::tcp::acceptor acceptor(io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port));
-    std::cout << "-------- AFTER_CREATED_SERVICE --------- "<< std::endl;
-    while (running_) {
-        std::cout << "-------- BEFORE_LISITENING --------- "<< std::endl;
-        try {
-            acceptor.accept();
-            Log2DataBase("tarsus_keep_alive", "Port is active and available.");
-        } catch (const boost::system::system_error&) {
-            Log2DataBase("tarsus_keep_alive", "Port is not available.");
+void logServer::watch_port_thread_fn(){
+    // 创建并启动定时循环线程
+    bool running = true;
+    std::thread timer([&running, this]() {
+        while (running) {
+            watch_port(); // 定时执行 watch_port 方法
+            std::this_thread::sleep_for(std::chrono::seconds(5)); // 定时间隔为 5 秒
         }
-        std::cout << "-------- AFTER_LISITENING --------- "<< std::endl;
-        std::this_thread::sleep_for(interval);
-        
+    });
+
+    // 主线程运行一段时间
+    std::this_thread::sleep_for(std::chrono::seconds(20)); // 主线程运行 20 秒
+
+    // 停止定时循环线程
+    running = false;
+    timer.join();
+}
+
+void logServer::watch_port()
+{
+
+    try {
+        boost::asio::io_service io_service;
+        boost::asio::ip::tcp::acceptor acceptor(io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port));
+        std::cout << "Port is active and available." << std::endl;
+    } catch (const boost::system::system_error&) {
+        std::cout << "Port is not available." << std::endl;
     }
 }
 
-void logServer::StartWatchPort(int port, int intervalSeconds) {
-    running_ = true;
-    timer_ = std::thread(&logServer::WatchPort, this, port, intervalSeconds);
-}
-
-void logServer::Log2DataBase(const std::string& tag, const std::string& message) {
-    // 实现将日志写入数据库的逻辑
-    // 这里只是示例，您需要根据实际情况实现该函数
-    std::cout << "-------- Log_START_2_PRINT --------- "<< std::endl;
-    std::cout << "[" << tag << "] " << message << std::endl;
-}
-
-logServer* LogServerFactory(LogServerParams::logServerConfig config) {
-    return new logServer(config);
-}
-
-logServer* LogServerFactory(string serverName) {
-    LogServerParams::DbConfig getDbConfig = LogServerParams::DbConfig();
-    LogServerParams::logServerConfig serverConfig;
-    serverConfig.dbConfig = getDbConfig;
-    serverConfig.serverName = serverName;
-    return new logServer(serverConfig);
+logServer::~logServer()
+{
 }

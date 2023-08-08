@@ -1,9 +1,9 @@
-#include<iostream>
-#include "./src/logServer/index.cpp"
+#include <iostream>
+#include "./src/logServer/logServer.cpp"
 using namespace std;
 
 int main(){
     cout<<"*********** start listening *********** "<<endl;
-    initLogServer();
+    logServer* myServer = new logServer();
     cout<<"***********    end   ****************** "<<endl;
 }
