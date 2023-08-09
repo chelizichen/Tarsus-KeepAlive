@@ -33,7 +33,7 @@ private:
     logServerParams::init initConfig;
 
 public:
-//    logServer(logServerParams::init initConfig);
+    logServer(logServerParams::init initConfig);
     logServer();
     ~logServer();
     void watch_port();
@@ -41,12 +41,12 @@ public:
     void initDataBase();
 };
 //
-//logServer::logServer(logServerParams::init initConfig){
-//    this->initConfig = initConfig;
-////    this->initDataBase();
-//
-//    watch_port_thread_fn();
-//}
+logServer::logServer(logServerParams::init initConfig){
+    this->initConfig = initConfig;
+    this->initDataBase();
+
+    watch_port_thread_fn();
+}
 
 void logServer::initDataBase(){
     MYSQL *conn = mysql_init(nullptr);

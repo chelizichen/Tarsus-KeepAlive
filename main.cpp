@@ -5,7 +5,7 @@ using namespace std;
 
 int main(){
     cout<<"*********** start listening *********** "<<endl;
-    auto* myServer = new logServer();
+    logServer* myServer = new logServer();
 //    myServer->initDataBase();
     cout<<"***********    end   ****************** "<<endl;
 }
